@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html>
+
+      <head>
+        <meta charset="utf-8" />
+        <title>A Probing Hash Table Framework</title>
+        <meta name="viewport" content="width=device-width" />
+        <meta name="description" content="The musings of a Computer Scientist/Educator." />
+        <link rel="canonical" href="https://chara.cs.illinois.edu/blog/2016/01/29/a-probing-hash-table-framework//" />
+        <link rel="stylesheet" href="/css/main.css" />
+    </head>
+
+
+  <body>
+
+        <!--[if lt IE 9]>
+    <script src="http://css3-mediaqueries-js.googlecode.com/svn/trunk/css3-mediaqueries.js"></script>
+    <![endif]-->
+    <script type="text/x-mathjax-config">
+      MathJax.Hub.Config({tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']],
+                         displayMath: [['\\[','\\]'], ['$$','$$']]}});
+    </script>
+    <script type="text/javascript"
+      src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+    </script>
+    <div id="main">
+      <header>
+        <div>
+          <div class="container">
+            <h1>Chase Geigle</h1>
+            <nav class="topnav">
+              <ul class="navigation">
+                <li><a href="/">Home</a></li>
+                <li><a href="/posts/">Posts</a></li>
+                <li><a href="/publications/">Publications</a></li>
+                <li><a href="/teaching/">Teaching</a></li>
+              </ul>
+            </nav>
+          </div>
+        </div>
+      </header>
+
+
+    <section class="content">
+      
+<div class="title">
+  <h1>A Probing Hash Table Framework</h1>
+  
+  <span class="date">Posted: January 29, 2016</span>
+  
+</div>
+
+<article>
+  <p>Data locality is <em>very</em> important. Keeping data close together in memory is
+a <em>huge</em> win on basically every modern computing device due to our systems’
+inherently multi-level memory hierarchy. Contiguous data leads to speed,
+and even some perhaps counter-intuitive results (like insert-and-shift into
+the middle of a dynamic array actually being <em>faster</em> than the equivalent
+linked list insertion<sup id="fnref:bjarne-vector"><a href="#fn:bjarne-vector" class="footnote">1</a></sup>).</p>
+
+<p>Despite these facts, interestingly enough the C++11 (and beyond) standard
+library provides a hash table implementation in <code class="highlighter-rouge">std::unordered_map</code> that
+is a <a href="https://en.wikipedia.org/wiki/Hash_table#Separate_chaining">separate chaining</a> hash table, with linked list buckets. This
+implementation implies a strong trade-off: while elements inserted into the
+map are guaranteed to be stable in memory (never needing to be moved or
+copied), we now must chase pointers when walking through the buckets in the
+hash table.</p>
+
+<p>What if we allow for keys to be moved/copied around as the hash table
+grows? If we relax the requirement that we never move key/value pairs after
+insertion, we now open the door for implementing a hash table using <a href="https://en.wikipedia.org/wiki/Hash_table#Open_addressing">open
+addressing</a>. Here, the table is stored as a single huge array
+containing either a key/value pair or nothing. On an insertion where a
+collision occurs, an empty slot is located by “probing” through the array
+looking for an empty slot, following some probing strategy. The most well
+known is linear probing, which <a href="https://en.wikipedia.org/wiki/Primary_clustering">has developed a bit of a bad
+reputation</a>. But is the disdain deserved?</p>
+
+<p>In this post, I’m going to walk you through some results that motivated the
+development of an <a href="https://github.com/meta-toolkit/meta/tree/master/include/meta/hashing">open source (insertion-only) probing hash table
+framework</a> that’s distributed as part of the <a href="https://meta-toolkit.org">MeTA
+toolkit</a>, and attempt to prove to you that naive, linear probing (or,
+at least, blocked probing) strategies are not nearly so bad as you might
+initially think. In particular, we’ll be benchmarking hash tables with both
+integer and string keys, taking a look at how they perform in terms of
+building time, memory consumption, and query throughput.</p>
+
+<h1 id="integer-hash-functions">Integer Hash Functions</h1>
+<p>First, let’s address something about hashing. Hash tables depend very
+strongly on their hash function behaving <em>close enough</em> to a random
+function (as in, the output of the function over the key space is uniform
+over the output space) in order to give their nice <script type="math/tex">O(1)</script> amortized
+guarantees<sup id="fnref:lp-independence"><a href="#fn:lp-independence" class="footnote">2</a></sup>.</p>
+
+<p>Furthermore, if your hash function is predictable (as in, someone can guess
+what your hash function might be), people <em>will</em> find out and <em>will</em> craft
+inputs to <a href="http://static.usenix.org/event/sec03/tech/full_papers/crosby/crosby_html/">take your server/application down</a>. Having a good
+(nearly uniform), unpredictable hash function is <em>very important</em>.</p>
+
+<p>With these criteria in mind, let’s see how two C++ standard library
+implementations fare in the case of hashing integers. I tested with the
+latest libstdc++ from GCC (packaged with 5.3.0 as of the time of writing)
+and libc++ (packaged with llvm/clang 3.7.1 as of the time of writing).</p>
+
+<p>Here’s a very basic snippet:</p>
+
+<figure class="highlight"><pre><code class="language-cpp" data-lang="cpp"><span class="cp">#include &lt;iostream&gt;
+#include &lt;functional&gt;
+</span>
+<span class="kt">int</span> <span class="nf">main</span><span class="p">()</span>
+<span class="p">{</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">hash</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span> <span class="n">h</span><span class="p">;</span>
+    <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="mi">4</span><span class="p">;</span> <span class="o">++</span><span class="n">i</span><span class="p">)</span>
+        <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">i</span> <span class="o">&lt;&lt;</span> <span class="s">" -&gt; "</span> <span class="o">&lt;&lt;</span> <span class="n">h</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">&lt;&lt;</span> <span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span></code></pre></figure>
+
+<p>Can you guess what the output is? To my surprise, it was:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>0
+1
+2
+3
+</code></pre>
+</div>
+
+<p>for both standard library implementations I have available.</p>
+
+<p>Every run.</p>
+
+<p>Yes my friends, the standard library hash function for integral types for
+the most commonly used standard libraries on Linux and OS X, respectively,
+is the <strong>identity function</strong> and has <strong>no randomization whatsoever</strong>,
+making it perfectly predictable.</p>
+
+<p>This is capital-B Bad and is a wide open door for attacks.</p>
+
+<p>OK, so fine, we’ll just not use <code class="highlighter-rouge">std::hash</code> and write one ourselves, right?</p>
+
+<p>And we’ll <em>definitely</em> be able to write a good one, right?</p>
+
+<p>And we’ll <em>definitely</em> not forget one of the <a href="http://en.cppreference.com/w/cpp/utility/hash">30 different
+specializations</a>, right?</p>
+
+<p>And you’ll <em>definitely</em> notice that I’m <em>strongly</em> hinting to you that this
+is a Very Bad Idea(TM), right?</p>
+
+<p>So what do we do? We certainly need to replace the hash function that’s
+being used by default if we care about minimizing our hash table attack
+surface, first and foremost. But you should <em>never, ever</em> write your own
+hash function<sup id="fnref:no-crypto"><a href="#fn:no-crypto" class="footnote">3</a></sup>, if you can help it.</p>
+
+<p>Fortunately, the C++ standard proposal paper <a href="https://isocpp.org/files/papers/n3980.html">N3980: Types Don’t Know
+#</a> has got this problem figured out (seriously, read that paper if
+you’re a C++ person: it’s absolutely brilliant). Hinnant et al. provide an
+easily extensible framework that decouples the hashing problem into two
+steps: providing to the implementation <em>what to hash</em> and then hashing
+those elements with a <em>generic, byte-oriented hash function</em>. This allows
+you to easily substitute your hash algorithm with a different one without
+having to rewrite all of your 30+ specializations to integrate it properly.</p>
+
+<p>You write, <strong>once</strong>, the definition of what it means for your specific type
+to be hashed (via a namespace-local, potentially <code class="highlighter-rouge">friend</code>, overload of
+<code class="highlighter-rouge">hash_append()</code> for your type, implemented in terms of <code class="highlighter-rouge">hash_append()</code> for
+the member elements of that type that need to contribute to generating the
+hash code for it).</p>
+
+<p>You write, <strong>once</strong>, the definition of what it means to has a sequence of
+bytes using your chosen hash function.  Changing the hash function to
+another one at a later date is trivial, and you do <em>not</em> have to write
+<em>any</em> specializations beyond providing the overload for <code class="highlighter-rouge">hash_append()</code> to
+specify <em>how</em> to hash your type.</p>
+
+<p>As our starting point, I <a href="https://github.com/meta-toolkit/meta/blob/master/include/meta/hashing/hash.h">implemented this framework</a> and provided
+several randomly-seeded hash functions that we can use for implementing our
+hash tables. By default, we’re currently using FarmHash for the default
+hash function on 64-bit machines, and Murmur3<sup id="fnref:murmur-bad"><a href="#fn:murmur-bad" class="footnote">4</a></sup> as the default
+hash function on 32-bit machines. But the wonderful thing is that I can
+change my mind at any date, change one line of code, and be off to the
+races using any of the other hash function’s I’ve implemented. This is
+<em>impossible</em> if you’re using <code class="highlighter-rouge">std::hash</code>.</p>
+
+<h1 id="probing-hash-tables-for-integers">Probing Hash Tables for Integers</h1>
+
+<p>Now that we’ve settled on a hash function, let’s do some benchmarking,
+shall we? The code for this benchmark is <a href="https://github.com/skystrife/hash-bench">available on Github</a>.
+For each hash table I compared against, I generated data for insertion
+calls by randomly generating <code class="highlighter-rouge">uint64_t</code> elements from the range <script type="math/tex">[0, n)</script>,
+where <script type="math/tex">n</script> was varied from 1,000,000 to 100,000,000 in increments of
+1,000,000.</p>
+
+<p>To evaluate the tables, we’ll take three looks on efficiency: building
+time, memory consumption, and query throughput.</p>
+
+<p>Our probing hash table in this case consists of a single probing array that
+contains the key/value pairs directly, ensuring that (in this case) the
+cells are exactly 16 bytes. However, we <em>do</em> need some way of telling
+whether a particular cell in that array is occupied by a valid key/value
+pair. To do this, and not waste any space, we sacrifice a single key value
+(called the sentinel) that will be stored in the cells that are not
+occupied by valid key/value data. The particular value that’s sacrificed to
+the hash table deities can be configured via <code class="highlighter-rouge">key_traits</code>. (And, if
+sacrificing a specific key value is not an option, you can use an
+alternative storage strategy that I’ll talk about later in the section on
+string hash tables.)</p>
+
+<h2 id="building-time">Building Time</h2>
+
+<figure><a href="/files/map-comparison/integer-building-time.svg"><img src="/files/map-comparison/integer-building-time.svg" /></a><figcaption><p><strong>Figure 1:</strong> Comparison of building times for integer hash tables</p>
+</figcaption></figure>
+
+<p>For the running time, there’s an interesting trade-off here. If you aren’t
+concerned about <code class="highlighter-rouge">std::hash&lt;uint64_t&gt;</code> being the identity function (maybe
+you can carefully control the input to your hash table, for example, to
+guarantee no evilness), it’s clear that just using <code class="highlighter-rouge">unordered_map&lt;uint64_t,
+uint64_t&gt;</code> is fine. In fact, it’s the fastest among the tables we tested.</p>
+
+<p>But if you’re at least a <em>little</em> concerned about those DoS attacks I
+mentioned earlier, you can see that the probing hash table (<code class="highlighter-rouge">probe_map</code> in
+the graph) is the clear winner.</p>
+
+<p>So then I asked the question: what if I use <code class="highlighter-rouge">std::hash</code> in a <code class="highlighter-rouge">probe_map</code>?
+Clearly, evaluating the hash function is more expensive when using
+<code class="highlighter-rouge">meta::hashing::hash&lt;&gt;</code> (FarmHash, by default), so maybe I can beat out
+<code class="highlighter-rouge">unordered_map</code> if I use a faster hash function?</p>
+
+<p>…and after about 10 hours of running what was supposed to be a “quick”
+test, I realized the problem: as soon as the table expands to larger than
+my random number input range, the keys are essentially <em>guaranteed</em> to
+coalesce into the front half of the table. The <em>only</em> case where elements
+can end up in cells <script type="math/tex">n</script> and beyond is if there was a collision at cell
+<script type="math/tex">n - 1</script>. So, because of our naive hash function, we’ve got the primal
+clustering problem on steroids. Not good.</p>
+
+<p>So don’t do that.</p>
+
+<p>I also compared <code class="highlighter-rouge">gcc</code> against <code class="highlighter-rouge">clang</code> here, and there was no discernible
+difference (the lines are literally right on top of one another in the
+graph, so I don’t present these results here).</p>
+
+<h2 id="memory-consumption">Memory Consumption</h2>
+
+<p>Next, let’s have a look at the memory consumption during building. I
+measured this by using <code class="highlighter-rouge">getrusage()</code> on my Linux-based testing environment
+and extracting the <code class="highlighter-rouge">ru_maxrss</code> field from the struct to get the number of
+kilobytes used by the program at its peak memory consumption.</p>
+
+<figure><a href="/files/map-comparison/integer-building-ram.svg"><img src="/files/map-comparison/integer-building-ram.svg" /></a><figcaption><p><strong>Figure 2:</strong> Comparison of memory consumption for integer hash tables</p>
+</figcaption></figure>
+
+<p>Here we can see one clear advantage of using the <code class="highlighter-rouge">probe_map</code>: it (most of
+the time) consumes less memory than the equivalent <code class="highlighter-rouge">unordered_map</code>. You’ll
+also see the obvious resizing jumps occurring more often, reflecting the
+library’s choice of a default resizing ratio of 1.5x instead of the
+commonly used 2x (though you have full control over this with <code class="highlighter-rouge">probe_map</code>,
+unlike <code class="highlighter-rouge">unordered_map</code>’s hardcoded default).</p>
+
+<p>I also compared against <code class="highlighter-rouge">gcc</code> again and, to no one’s surprise, it is
+exactly the same as <code class="highlighter-rouge">clang</code> here, so I didn’t bother cluttering the graph.</p>
+
+<h2 id="query-throughput">Query Throughput</h2>
+
+<p>So far so good. Now let’s consider the query throughput: how quickly can I
+look up every element (including the duplicates) that I inserted in the
+table? We report the number of queries one can perform in a second here, in
+millions.</p>
+
+<figure><a href="/files/map-comparison/integer-query-rates.svg"><img src="/files/map-comparison/integer-query-rates.svg" /></a><figcaption><p><strong>Figure 3:</strong> Comparison of query rates for integer hash tables</p>
+</figcaption></figure>
+
+<p>Since you can finally tell the difference between <code class="highlighter-rouge">gcc</code> and <code class="highlighter-rouge">clang</code> here, I
+report both in the graph (though their differences are insignificant). At
+the very top we have <code class="highlighter-rouge">probe_map</code>, which seems to remain relatively constant
+at around 1.56 million lookups/second after it dips around the 10 million
+insertion mark. Below that, perhaps predictably, are <code class="highlighter-rouge">unordered_map</code> with
+<code class="highlighter-rouge">std::hash</code> and <code class="highlighter-rouge">unordered_map</code> with <code class="highlighter-rouge">meta::hashing::hash&lt;&gt;</code>. The
+throughput is hurt significantly by having a more sophisticated hash
+function. Fortunately, it seems that you can easily get the best of both
+worlds by using <code class="highlighter-rouge">probe_map</code>.</p>
+
+<h1 id="probing-hash-tables-with-string-keys">Probing Hash Tables with String Keys</h1>
+
+<p>Strings are perhaps the most common key type used in hash tables, and
+represent a significantly different challenge compared to hashing integer
+keys. A C++11 compliant <code class="highlighter-rouge">std::string</code> implementation is significantly
+larger than a <code class="highlighter-rouge">uint64_t</code>: as of the time of writing libc++ uses 24 bytes
+and libstdc++ uses 32 bytes. This makes using a simplistic probing hash
+table significantly less efficient. When using integer keys and values, we
+could get away with just storing them directly in the array used for
+probing due to their small size (the probing elements were only 16 bytes).
+If we store a probing element that contains a <code class="highlighter-rouge">std::string</code> key and a
+<code class="highlighter-rouge">uint64_t</code> value, we waste somewhere between 32 and 40 bytes per empty
+cell, and there will typically be a lot of empty cells in a probing hash
+table (common wisdom suggests maximum load factors of around 0.7 for
+probing tables<sup id="fnref:quad-probe"><a href="#fn:quad-probe" class="footnote">5</a></sup>; we’ve opted for a more aggressive 0.85
+default, but these values are configurable in <code class="highlighter-rouge">probe_map</code> just as they are
+for <code class="highlighter-rouge">unordered_map</code>.).</p>
+
+<p>To get around this, the <code class="highlighter-rouge">probe_map</code> implementation detects whether your key
+is “inlineable” or not using a <code class="highlighter-rouge">key_traits</code> class. Right now, only integral
+values are considered “inlineable” and everything else is not. If a key
+type is not “inlineable”, we change our representation of the table up
+slightly. We still have a large array for probing, which contains two
+integers: one that indicates the hash code of the element that occupies
+that cell, and one that indicates the <em>index into another array</em> where that
+key/value pair can be found, plus 1 (if the index value is 0, this
+signifies an empty cell).</p>
+
+<p>This has a couple advantages. First, these kinds of nontrivial keys tend to
+have more complicated equality operators than just a single integer
+comparison. In the case of a <code class="highlighter-rouge">std::string</code>, this is a standard
+lexicographic comparison against a byte buffer that could be located in a
+non-local part of memory provided the string is long enough. If we call
+<code class="highlighter-rouge">operator==</code> on every string as we probe, each call could potentially
+result in a cache-miss <em>even if the cells are right next to each other</em>
+since the “real” data (the byte buffer) is elsewhere. Instead, we’ll first
+check whether the hash code of the element we’re looking for is equal to
+the hash code that we’ve cached at that cell in the probing array (which
+won’t incur an additional cache miss). Only if those hash codes are equal
+do we go ahead and perform potentially expensive <code class="highlighter-rouge">operator==</code> call.</p>
+
+<p>Second, it allows the wasted space for empty cells in the probing table to
+continue to be only 16 bytes as opposed to 32 to 40. This can save quite a
+bit of space since the probing table is likely to have a lot of empty
+cells. Unfortunately, it’s not all space savings, since the secondary array
+storing the key/value pairs is also likely to have many empty cells, since
+we use an exponential-resizing <code class="highlighter-rouge">std::vector</code> for their storage.</p>
+
+<p>With that explanation out of the way, let’s compare our <code class="highlighter-rouge">probe_map</code> against
+<code class="highlighter-rouge">unordered_map</code> again, using the same criteria as we did for the integer
+case: building speed, memory consumption, and query throughput. Here, we’ve
+generated string keys by taking the exact same data as we used in the
+integer benchmarks, but converting the integers to their string
+representations first.</p>
+
+<h2 id="building-time-1">Building Time</h2>
+
+<figure><a href="/files/map-comparison/string-building-time.svg"><img src="/files/map-comparison/string-building-time.svg" /></a><figcaption><p><strong>Figure 4:</strong> Comparison of building times for string hash tables</p>
+</figcaption></figure>
+
+<p>Building time is essentially the same across the tables, with <code class="highlighter-rouge">probe_map</code>
+performing slightly worse in some spots due to the more frequent resizing
+cost. However, it’s interesting to see that <code class="highlighter-rouge">unordered_map</code> with
+<code class="highlighter-rouge">std::hash</code> actually starts to perform <em>worse</em> than <code class="highlighter-rouge">unordered_map</code> with
+<code class="highlighter-rouge">meta::hashing::hash&lt;&gt;</code> towards the very end of the benchmark (at around
+85,000,000 insertions). It’s also interesting to note that <code class="highlighter-rouge">unordered_map</code>
+and <code class="highlighter-rouge">probe_map</code> converge to about the same performance around 95,000,000
+insertions if they are both using FarmHash.</p>
+
+<h2 id="memory-consumption-1">Memory Consumption</h2>
+
+<figure><a href="/files/map-comparison/string-building-ram.svg"><img src="/files/map-comparison/string-building-ram.svg" /></a><figcaption><p><strong>Figure 5:</strong> Comparison of memory consumption for string hash tables</p>
+</figcaption></figure>
+
+<p><code class="highlighter-rouge">probe_map</code> loses the memory battle to <code class="highlighter-rouge">unordered_map</code> by significant
+margins at many insertion counts, and we suspect the secondary array’s
+blank cells account for a lot of the extra weight. Fortunately, the extra
+memory usage is frequently followed by a long period of growth that is at a
+significantly lower rate than <code class="highlighter-rouge">unordered_map</code>, allowing it to “catch up” at
+a couple of insertion count points.</p>
+
+<h2 id="query-throughput-1">Query Throughput</h2>
+
+<figure><a href="/files/map-comparison/string-query-rates.svg"><img src="/files/map-comparison/string-query-rates.svg" /></a><figcaption><p><strong>Figure 6:</strong> Comparison of query rates for string hash tables</p>
+</figcaption></figure>
+
+<p>Here we can start to see some interesting differences between <code class="highlighter-rouge">clang</code> and
+<code class="highlighter-rouge">gcc</code>. At the top of the graph is <code class="highlighter-rouge">probe_map</code>, which has a higher query
+throughput than any of the standard library implementations by a good
+margin. Interestingly, though, <code class="highlighter-rouge">gcc</code> seems to deteriorate faster than
+<code class="highlighter-rouge">clang</code> starting around the 50,000,000 insertion mark (and I have no
+explanation for why it suddenly jumps back up at the very last 100,000,000
+insertion count, especially because it <a href="https://github.com/skystrife/hash-bench/blob/master/graphs/gcc/probe-map-strings.tsv">doesn’t appear to be due to
+variance</a>).</p>
+
+<p><code class="highlighter-rouge">gcc</code>, however, does redeem itself when comparing the <code class="highlighter-rouge">unordered_map</code>
+implementations. When both are using <code class="highlighter-rouge">std::hash</code>, <code class="highlighter-rouge">gcc</code> starts to pull away
+from <code class="highlighter-rouge">clang</code> at around the 55,000,000 insertion mark. Here, <code class="highlighter-rouge">clang</code> with
+<code class="highlighter-rouge">std::hash</code> begins a steady decline that makes it even slower than the
+<code class="highlighter-rouge">unordered_map</code> implementations with FarmHash at around 70,000,000
+insertions.</p>
+
+<h1 id="conclusions">Conclusions</h1>
+
+<p>These results to me speak the following trade-offs for inlineable and
+non-inlineable keys:</p>
+
+<ul>
+  <li>
+    <p>For small (integer) keys, <code class="highlighter-rouge">probe_map</code> trades build time for query
+  throughput. It would be interesting to see whether increasing the
+  resize ratio or maximum load factor could change the incline of the
+  build time graph.</p>
+  </li>
+  <li>
+    <p>For large (string) keys, <code class="highlighter-rouge">probe_map</code> trades memory usage for query
+  throughput. Investigating different secondary storage types might be
+  helpful in reducing the wasted space, but may imply other trade-offs.</p>
+  </li>
+</ul>
+
+<p>If you have a need for a hash table with very fast query speed, using
+<code class="highlighter-rouge">probe_map</code> over <code class="highlighter-rouge">unordered_map</code> might make sense (provided you won’t miss
+<code class="highlighter-rouge">erase()</code>, which is currently unimplemented because we simply don’t use it
+often enough to care).</p>
+
+<h1 id="acknowledgments">Acknowledgments</h1>
+
+<p>I’d like to thank <a href="http://web.engr.illinois.edu/~massung1/">Sean Massung</a> and Chelsea Neely for their
+feedback on a draft version of this post, and <a href="http://jeffe.cs.illinois.edu/teaching/datastructures/">Jeff Erickson’s Advanced
+Data Structures</a> course for inspiring the work.</p>
+
+<h1 id="edits">Edits</h1>
+<ul>
+  <li>2016-01-31: Added a paragraph that discusses the use of a sentinel value
+  for inlineable keys to signify the empty cell.</li>
+</ul>
+
+<div class="footnotes">
+  <ol>
+    <li id="fn:bjarne-vector">
+
+      <p>Seriously. Check out <a href="https://channel9.msdn.com/Events/GoingNative/GoingNative-2012/Keynote-Bjarne-Stroustrup-Cpp11-Style">Bjarne Stroustrup’s GoingNative 2012
+keynote</a>
+at about 44 minutes.&nbsp;<a href="#fnref:bjarne-vector" class="reversefootnote">&#8617;</a></p>
+    </li>
+    <li id="fn:lp-independence">
+
+      <p>For linear probing (and blocked probing strategies in general), it’s
+been shown that your hash function needs to be <a href="http://www.itu.dk/people/pagh/papers/linear-jour.pdf">five-way
+independent</a> in order to guarantee good performance.
+Fortunately, one can construct hash functions that satisfy this
+property relatively easily. Unfortunately, nobody really seems to be
+using functions that guarantee this property in practice (including
+me).&nbsp;<a href="#fnref:lp-independence" class="reversefootnote">&#8617;</a></p>
+    </li>
+    <li id="fn:no-crypto">
+
+      <p>Or your own crypto system. These are both Very Bad Ideas(TM).&nbsp;<a href="#fnref:no-crypto" class="reversefootnote">&#8617;</a></p>
+    </li>
+    <li id="fn:murmur-bad">
+
+      <p>Although, since then, it’s been discovered that Murmur3 hash has
+<a href="http://emboss.github.io/blog/2012/12/14/breaking-murmur-hash-flooding-dos-reloaded/">seed-independent collision
+problems</a>,
+meaning that even in the face of a randomly-generated seed at program
+startup, people can still break your stuff. The best alternative thus
+far seems to be <a href="https://131002.net/siphash/">SipHash</a>, which can be
+easily integrated into this framework.&nbsp;<a href="#fnref:murmur-bad" class="reversefootnote">&#8617;</a></p>
+    </li>
+    <li id="fn:quad-probe">
+
+      <p>With the exception of quadratic probing, which isn’t guaranteed to find
+an empty slot in the table if it’s more than half full!&nbsp;<a href="#fnref:quad-probe" class="reversefootnote">&#8617;</a></p>
+    </li>
+  </ol>
+</div>
+
+</article>
+
+
+
+    </section>
+
+          <footer>
+        <p>&copy; Chase Geigle, 2018 | All Rights Reserved.</p>
+      </footer>
+    </div>
+  </body>
+</html>
+
+
+  </body>
+</html>

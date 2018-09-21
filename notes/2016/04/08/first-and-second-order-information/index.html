@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+
+      <head>
+        <meta charset="utf-8" />
+        <title>How "Predictive Text Embedding" Captures Second-Order Information</title>
+        <meta name="viewport" content="width=device-width" />
+        <meta name="description" content="The musings of a Computer Scientist/Educator." />
+        <link rel="canonical" href="https://chara.cs.illinois.edu/notes/2016/04/08/first-and-second-order-information//" />
+        <link rel="stylesheet" href="/css/main.css" />
+    </head>
+
+
+  <body>
+
+        <!--[if lt IE 9]>
+    <script src="http://css3-mediaqueries-js.googlecode.com/svn/trunk/css3-mediaqueries.js"></script>
+    <![endif]-->
+    <script type="text/x-mathjax-config">
+      MathJax.Hub.Config({tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']],
+                         displayMath: [['\\[','\\]'], ['$$','$$']]}});
+    </script>
+    <script type="text/javascript"
+      src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+    </script>
+    <div id="main">
+      <header>
+        <div>
+          <div class="container">
+            <h1>Chase Geigle</h1>
+            <nav class="topnav">
+              <ul class="navigation">
+                <li><a href="/">Home</a></li>
+                <li><a href="/posts/">Posts</a></li>
+                <li><a href="/publications/">Publications</a></li>
+                <li><a href="/teaching/">Teaching</a></li>
+              </ul>
+            </nav>
+          </div>
+        </div>
+      </header>
+
+
+    <section class="content">
+      
+<div class="title">
+  <h1>How "Predictive Text Embedding" Captures Second-Order Information</h1>
+  
+  <span class="date">Posted: April 08, 2016</span>
+  
+</div>
+
+<article>
+  <p>“Predictive Text Embedding”<sup id="fnref:pte"><a href="#fn:pte" class="footnote">1</a></sup> argues that it is designed around
+capturing “second-order” information in the underlying bipartite graphs it
+uses for training the embeddings. I’ll attempt to rephrase how it does so
+here.</p>
+
+<p>They define the probability of “generating” a vertex $v_i \in V_A$ from a
+vertex $v_j \in V_B$ (where $V_A$ and $V_B$ are the two different, disjoint
+vertex sets in the bipartite graph) as</p>
+
+<script type="math/tex; mode=display">\hat{p}(v_i \mid v_j) = \frac{w_{ij}}{\sum_{k} w_{kj}},</script>
+
+<p>which is exactly the same as the (weighted) random walk probability of
+visiting node $v_i$ given that you are currently at node $v_j$.</p>
+
+<p>They then attempt to model this probability with their embeddings as</p>
+
+<script type="math/tex; mode=display">p(v_i \mid v_j) = \frac{\exp\{u_i^T \cdot u_j\}}
+                         {\sum_k \exp\{u_k^T \cdot u_j\}}</script>
+
+<p>by adjusting the embedding vectors $u_i$ to minimize the KL-divergence
+between $\hat{p}$ and $p$.</p>
+
+<p>In some sense, this is looking at “first-order” information: it is
+capturing how likely you are to move from a specific vertex one side of the
+graph to another specific vertex on the opposite side in one single hop if
+performing a random walk. However, they argue that this allows the
+<strong>embeddings</strong> $u_i$ to capture second-order similarity information. Here’s
+how.</p>
+
+<p>Consider two vertices $v_i$ and $v_k$ both from $V_A$. We want the
+corresponding embedding vectors $u_i$ and $u_k$ to be similar if the
+second-order similarity between $v_i$ and $v_k$ is high. Here, they mean
+“neighborhood similarity” as “second-order similarity”.</p>
+
+<p>Now, consider how the model captures the neighborhood of $v_i$. We can look
+at the probability distribution $p(\bullet \mid v_i)$, which tells us which
+immediate neighbors of $v_i$ are most likely visited in the next jump in a
+(weighted) random walk. If $v_k$ shares a similar neighborhood as $v_i$, we
+would like the probability distribution $p(\bullet \mid v_k)$ to be similar
+to $p(\bullet \mid v_i)$. Let’s consider just one event in this
+distribution for now: $v_j$. We have that</p>
+
+<script type="math/tex; mode=display">p(v_j \mid v_i) = \frac{\exp\{u_j^T \cdot u_i\}}
+                         {\sum_{j'} \exp\{u_{j'}^T \cdot u_i\}}</script>
+
+<p>and that</p>
+
+<script type="math/tex; mode=display">p(v_j \mid v_k) = \frac{\exp\{u_j^T \cdot u_k\}}
+                         {\sum_{j'} \exp\{u_{j'}^T \cdot u_k\}}</script>
+
+<p>If we want these two probabilities to be similar, we necessarily must have
+that $u_i$ and $u_k$ be very similar: this is the only part that is
+different in the above equations. Thus, if the <strong>data distributions</strong>
+$\hat{p}(\bullet \mid v_i)$ and $\hat{p}(\bullet \mid v_k)$ are quite
+similar (meaning that $v_i$ and $v_k$ share similar neighborhood structures
+in the underlying bipartite graph), in order to make the <strong>model
+distributions</strong> capture this we require the embedding for $v_i$ to be
+similar to the embedding for $v_k$. So the <strong>embeddings</strong> then capture the
+second-order network structure similarity because we tune them to be able
+to predict the first-order network structure (the normalized edge weights)
+via $p(\bullet \mid v_i)$.</p>
+
+<p>(I think the terminology “first-order” and “second-order” are quite
+confusing and muddy up the understanding of this paper a bit.)</p>
+
+<div class="footnotes">
+  <ol>
+    <li id="fn:pte">
+      <p><a href="http://arxiv.org/abs/1508.00200">PTE: Predictive Text Embedding through Large-scale Heterogeneous Text Networks</a>&nbsp;<a href="#fnref:pte" class="reversefootnote">&#8617;</a></p>
+    </li>
+  </ol>
+</div>
+
+</article>
+
+
+
+    </section>
+
+          <footer>
+        <p>&copy; Chase Geigle, 2018 | All Rights Reserved.</p>
+      </footer>
+    </div>
+  </body>
+</html>
+
+
+  </body>
+</html>

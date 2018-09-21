@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+
+      <head>
+        <meta charset="utf-8" />
+        <title>Systems Programming in Data Science</title>
+        <meta name="viewport" content="width=device-width" />
+        <meta name="description" content="The musings of a Computer Scientist/Educator." />
+        <link rel="canonical" href="https://chara.cs.illinois.edu/blog/2015/09/18/systems-programming-in-data-science//" />
+        <link rel="stylesheet" href="/css/main.css" />
+    </head>
+
+
+  <body>
+
+        <!--[if lt IE 9]>
+    <script src="http://css3-mediaqueries-js.googlecode.com/svn/trunk/css3-mediaqueries.js"></script>
+    <![endif]-->
+    <script type="text/x-mathjax-config">
+      MathJax.Hub.Config({tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']],
+                         displayMath: [['\\[','\\]'], ['$$','$$']]}});
+    </script>
+    <script type="text/javascript"
+      src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+    </script>
+    <div id="main">
+      <header>
+        <div>
+          <div class="container">
+            <h1>Chase Geigle</h1>
+            <nav class="topnav">
+              <ul class="navigation">
+                <li><a href="/">Home</a></li>
+                <li><a href="/posts/">Posts</a></li>
+                <li><a href="/publications/">Publications</a></li>
+                <li><a href="/teaching/">Teaching</a></li>
+              </ul>
+            </nav>
+          </div>
+        </div>
+      </header>
+
+
+    <section class="content">
+      
+<div class="title">
+  <h1>Systems Programming in Data Science</h1>
+  
+  <span class="date">Posted: September 18, 2015</span>
+  
+</div>
+
+<article>
+  <p>A former student of mine recently asked a good question:</p>
+
+<blockquote>
+  <p>Is &lt;systems programming course&gt; really beneficial for everyone? I
+want to do NLP and &lt;systems programming course&gt; makes me feel like
+the political science major in a math class complaining “WHEN WILL I EVER
+NEED TO USE THIS MULTIPLICATION STUFF?”</p>
+</blockquote>
+
+<p>This speaks to me. Throughout my undergraduate education, I always needed
+to find an answer to “why study this” before I could really get into the
+material. Too often, courses just presuppose that students understand why
+the material is useful and offer little to no explanation for the
+applicability of what’s being taught.</p>
+
+<p>I’m sure I’m just as guilty as others of this.</p>
+
+<p>This question is borne from a question of “how does this apply to <strong>me</strong>”,
+which is a good question to be asking. In fact, one of the things that my
+advisor always stresses is to be able to think of at least one application
+of some technique to your own work for <strong>any presentation you listen to,
+ever</strong>. He’s some sort of deity at this, because without fail he will
+always ask some question that ties in the presenter’s research with his
+own in a way that could easily be a stepping stone toward collaboration.</p>
+
+<p>Here’s my answer to “why should I study systems level programming for a
+degree/career in data science”. I define “data science” loosely to include
+NLP mentioned above, but this applies just as well to the entire field of
+<a href="https://cs.illinois.edu/research/research-areas/database-information-systems">Database and Information Systems</a>.</p>
+
+<h1 id="real-world-performance-matters">Real-world performance matters</h1>
+
+<p>Suppose you design a new algorithm for solving some inference task. An easy
+to overlook but very important aspect of actually implementing that
+algorithm is going to be the question: is it parallelizable? Note that
+there are two systems programming aspects here: threads and synchronization
+(parallelization on <em>one</em> machine) as well as networking/distributed
+systems (parallelization on <em>several</em> machines). Both of these
+considerations need, at a bare minimum, rudimentary understanding of
+systems level programming. If your algorithm gives us 1% better F1 score
+but takes 100% more time, chances are it won’t be adopted. <strong>Time
+constraints in data science are very real.</strong></p>
+
+<p>A perfect example of this is the <a href="https://kheafield.com/code/kenlm/">KenLM</a> project resulting from
+<a href="https://kheafield.com/">Kenneth Heafield</a>’s PhD study. His thesis was “<a href="https://kheafield.com/professional/thesis.pdf">Efficient
+Language Modeling Algorithms with Applications to Statistical Machine
+Translation</a>”, which was motivated by the observation that
+<a href="http://www.statmt.org/">statistical machine translation</a> performance improves monotonically
+with the amount of data used to train the target-side <a href="https://en.wikipedia.org/wiki/Language_model">language
+model</a>.  Unfortunately, existing systems were often too slow in
+practice for real MT systems to throw web-scale data into their language
+model, unless you were Google and could throw 100+ machines and several
+entire DAYS at estimating your language model. And even then, you still
+would need approximations.</p>
+
+<p>That is, before KenLM was implemented.</p>
+
+<h1 id="sharing-your-results-as-a-real-world-system">Sharing your results as a real-world system</h1>
+
+<p>Suppose you’ve designed a cool system that you want to show the world.
+Probably, you’re going to set up some sort of web-based demo. Suddenly
+you’re faced with the task of integrating your algorithm with some
+web-facing application. There’s a ton of ways to do this, but the simplest
+one is to design some basic HTTP-based API for your tool. Now you’re
+dealing with networking again. Granted, you’re probably going to use some
+library to abstract things away from direct BSD socket APIs, but the same
+fundamental concepts are going to apply. How will your service handle
+multiple clients at the same time? Threads? A reactor/event loop? Now
+you’ve got to think about how your algorithm ties in to that. Are your
+models thread safe? Can they be safely integrated into a non-blocking,
+evented IO loop?</p>
+
+<p>These are the same issues practitioners will encounter when/if they try to
+leverage your models in real systems. It’s important to think about your
+algorithms in the bigger context of some real system: if it’s impossible to
+integrate, it won’t be used.</p>
+
+<h1 id="my-own-personal-anecdote">My own personal anecdote</h1>
+
+<p>In general, you can’t get away with ignoring systems stuff in designing
+<strong>real</strong> systems.  Now, if you want to be the guy that spends all of his
+time in theory land and mathematics, go right ahead (malloc is constant
+time! I have <em>all</em> the memory! What’s “out-of-core”?).</p>
+
+<p>But at the end of the day <strong>someone like me</strong> has to implement the
+algorithm on a real computer, and these systems level things come in to
+play <strong>all the time</strong>. My short list:</p>
+
+<ul>
+  <li><strong>Threading and synchronization:</strong> threads, mutexes, condition variables,
+  semaphores, deadlock avoidance, readers-writers locks, …</li>
+  <li><strong>Caching:</strong> both on the actual CPU and for your own results</li>
+  <li><strong>Networking:</strong> sockets, TCP vs UDP, blocking vs non-blocking IO,
+  linearizability and eventual consistency, …</li>
+  <li><strong>Filesystems and Serialization:</strong> in-memory to on-disk model storage (hint,
+  you deal with bytes, endianness, and compression!), buffering,
+  transaction-safety, …</li>
+</ul>
+
+<p>Here’s a simple real example from my experience: by understanding how to
+use tools like profilers, coupled with a knowledge that “geez, malloc() is
+really expensive!”<sup id="fnref:strings"><a href="#fn:strings" class="footnote">1</a></sup>, I was able to nearly double the throughput of
+the text analysis pipeline in <a href="https://meta-toolkit.org">MeTA</a>.</p>
+
+<p>When you’re dealing with truly vast amounts of data, a few milliseconds per
+data item adds up. <strong>Constants matter in real-world systems.</strong></p>
+
+<blockquote>
+  <p>For every polynomial-time algorithm you have, there is an exponential
+algorithm that I would rather run.
+— <a href="http://en.wikipedia.org/wiki/Alan_Perlis">Alan Perlis</a></p>
+</blockquote>
+
+<p>A better understanding of the system will lead to better performing
+algorithms, often in surprising ways. Things like cache-effects and
+false-sharing become incredibly important as you scale things.</p>
+
+<div class="footnotes">
+  <ol>
+    <li id="fn:strings">
+
+      <p>Seriously, <a href="https://github.com/smassung/porter2_stemmer/issues/2">strings are
+<strong>BAD</strong></a>.&nbsp;<a href="#fnref:strings" class="reversefootnote">&#8617;</a></p>
+    </li>
+  </ol>
+</div>
+
+</article>
+
+
+
+    </section>
+
+          <footer>
+        <p>&copy; Chase Geigle, 2018 | All Rights Reserved.</p>
+      </footer>
+    </div>
+  </body>
+</html>
+
+
+  </body>
+</html>

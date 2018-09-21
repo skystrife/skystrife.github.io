@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html>
+
+      <head>
+        <meta charset="utf-8" />
+        <title>The Copy and Swap Idiom</title>
+        <meta name="viewport" content="width=device-width" />
+        <meta name="description" content="The musings of a Computer Scientist/Educator." />
+        <link rel="canonical" href="https://chara.cs.illinois.edu/blog/2014/08/27/copy-and-swap//" />
+        <link rel="stylesheet" href="/css/main.css" />
+    </head>
+
+
+  <body>
+
+        <!--[if lt IE 9]>
+    <script src="http://css3-mediaqueries-js.googlecode.com/svn/trunk/css3-mediaqueries.js"></script>
+    <![endif]-->
+    <script type="text/x-mathjax-config">
+      MathJax.Hub.Config({tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']],
+                         displayMath: [['\\[','\\]'], ['$$','$$']]}});
+    </script>
+    <script type="text/javascript"
+      src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+    </script>
+    <div id="main">
+      <header>
+        <div>
+          <div class="container">
+            <h1>Chase Geigle</h1>
+            <nav class="topnav">
+              <ul class="navigation">
+                <li><a href="/">Home</a></li>
+                <li><a href="/posts/">Posts</a></li>
+                <li><a href="/publications/">Publications</a></li>
+                <li><a href="/teaching/">Teaching</a></li>
+              </ul>
+            </nav>
+          </div>
+        </div>
+      </header>
+
+
+    <section class="content">
+      
+<div class="title">
+  <h1>The Copy and Swap Idiom</h1>
+  
+  <span class="date">Posted: August 27, 2014</span>
+  
+</div>
+
+<article>
+  <p>Before we move into discussing move semantics (the next step on my quest to
+convert you all to teaching in C++14), let’s clear up something that I
+often see being taught in a subtly “wrong” way with respect to memory
+management in even C++98.</p>
+
+<p>Consider the following class, which might be written by a student in a
+fundamental data structures course:</p>
+
+<div class="language-cpp highlighter-rouge"><pre class="highlight"><code><span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">T</span><span class="o">&gt;</span>
+<span class="k">class</span> <span class="nc">dynamic_array</span>
+<span class="p">{</span>
+  <span class="k">public</span><span class="o">:</span>
+    <span class="n">dynamic_array</span><span class="p">();</span>
+
+    <span class="n">dynamic_array</span><span class="p">(</span><span class="kt">size_t</span><span class="p">);</span>
+
+    <span class="n">dynamic_array</span><span class="p">(</span><span class="k">const</span> <span class="n">dynamic_array</span><span class="o">&amp;</span><span class="p">);</span>
+
+    <span class="n">dynamic_array</span><span class="o">&amp;</span> <span class="k">operator</span><span class="o">=</span><span class="p">(</span><span class="k">const</span> <span class="n">dynamic_array</span><span class="o">&amp;</span><span class="p">);</span>
+
+    <span class="o">~</span><span class="n">dynamic_array</span><span class="p">();</span>
+
+    <span class="c1">// other functions, e.g. operator[], push_back(), push_front(), size(), etc.
+</span>
+  <span class="k">private</span><span class="o">:</span>
+    <span class="n">T</span><span class="o">*</span> <span class="n">storage_</span><span class="p">;</span>
+    <span class="kt">size_t</span> <span class="n">size_</span><span class="p">;</span>
+    <span class="kt">size_t</span> <span class="n">capacity_</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre>
+</div>
+
+<p>What we see here is standard fare: we have a class that utilizes dynamic
+memory (via the <code class="highlighter-rouge">storage_</code> pointer), and thus is provides the “Big Three”:
+a copy constructor, an assignment operator, and a destructor. These three
+overloads give us the value semantics that we desire, making it so that our
+class can “blend in” with the built in types of the language and standard
+library. C++ is <em>rooted</em> in value semantics, so it’s <strong>crucial</strong> that we get
+this right so that our classes are well behaved.</p>
+
+<p>But let’s look more closely at our assignment operator. You may have seen
+it written something like this:</p>
+
+<div class="language-cpp highlighter-rouge"><pre class="highlight"><code><span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">T</span><span class="o">&gt;</span>
+<span class="n">dynamic_array</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;&amp;</span> <span class="n">dynamic_array</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;::</span><span class="k">operator</span><span class="o">=</span><span class="p">(</span><span class="k">const</span> <span class="n">dynamic_array</span><span class="o">&amp;</span> <span class="n">rhs</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="k">this</span> <span class="o">!=</span> <span class="o">&amp;</span><span class="n">rhs</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">clear</span><span class="p">();</span>
+        <span class="n">copy</span><span class="p">(</span><span class="n">rhs</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="o">*</span><span class="k">this</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>where <code class="highlighter-rouge">clear()</code> is a helper function for releasing the memory associated
+with the current object, and <code class="highlighter-rouge">copy()</code> is another helper function that is
+responsible for creating the memory for a new independent copy of the
+parameter, assigning it into the current object.</p>
+
+<p><strong>There are actually a couple of problems with this approach.</strong></p>
+
+<h2 id="pedagogical-complaints">Pedagogical Complaints</h2>
+
+<p>Because the language semantics are often taught very early on in the
+course, and (at least at UIUC) to fairly inexperienced programmers (through
+no fault of their own: it’s just their second programming experience in the
+curriculum in its current form), you have to dance around this issue of the
+“self assignment” check.</p>
+
+<h3 id="this--rhs-an-enigma-for-green-students"><code class="highlighter-rouge">this != &amp;rhs</code>: an enigma for “green” students</h3>
+<p><code class="highlighter-rouge">this != &amp;rhs</code> is particularly nuanced for students still struggling to
+understand some of the fundamental differences between Java and C++ (or C
+and C++). This requires them to understand:</p>
+
+<ul>
+  <li>
+    <p>the type of <code class="highlighter-rouge">this</code> (a <em>pointer</em> to the current instance)</p>
+  </li>
+  <li>
+    <p>the purpose of <code class="highlighter-rouge">&amp;rhs</code> as getting a pointer to the argument (<em>not</em> a
+reference, and understanding that <code class="highlighter-rouge">rhs</code> itself is <em>not</em> a
+pointer)</p>
+  </li>
+  <li>
+    <p>what it would mean if <code class="highlighter-rouge">this == &amp;rhs</code>.</p>
+  </li>
+</ul>
+
+<p>That’s quite a bit of information we’re expecting them to digest in just a
+short little snippet. But if you write your assignment operator this way,
+it’s such a critical moment: if they forget this check, they will have
+memory errors coming out of their ears.</p>
+
+<h2 id="technical-complaints">Technical Complaints</h2>
+
+<p>However, that’s not the real meat of my argument. My real beef with this
+setup is that it is <strong>completely exception unsafe</strong>. And, unless you’re
+living in a fairytale world where you</p>
+
+<ul>
+  <li>never allocate to the free store, and</li>
+  <li>never use the standard library</li>
+</ul>
+
+<p>ignoring exceptions will be a <strong>fatal mistake</strong> at some point in your
+experience with C++.</p>
+
+<p>And, <strong>please</strong> don’t come to me claiming that your codebase “doesn’t throw
+exceptions”, because you and I both know that’s just a load of crock. =)</p>
+
+<p>Nearly every <strong>useful</strong> program is going to <em>at least</em> do one (and, likely,
+both) of the above two things. This means you <strong>have</strong> to care about
+exceptions.</p>
+
+<h3 id="exception-safety">Exception Safety</h3>
+<p>So what’s “unsafe” about this code?</p>
+
+<p>Patience, young padawan. Let’s take a step back.</p>
+
+<p>First, let’s identify <strong>where exceptions could be thrown</strong>, and then define
+<strong>what we want our class to do in the event of an exception</strong>. This will
+define what kind of “exception safety guarantee” we want to provide.</p>
+
+<p>One of the bullet points I made above (when I was being rude; sorry) was
+that the memory allocator can throw exceptions. How could that be the case?
+Let’s look at three fairly simple examples:</p>
+
+<ul>
+  <li>
+    <p>We’re out of memory. This causes a <code class="highlighter-rouge">std::bad_alloc</code> exception to be
+thrown from the call to <code class="highlighter-rouge">new[]</code> that we’ll be using to allocate our
+array.</p>
+  </li>
+  <li>
+    <p>A constructor for an element in the array throws during the <code class="highlighter-rouge">new[]</code> call.</p>
+  </li>
+  <li>
+    <p>The assignment operator for an element in the new array throws when we
+are copying the data.</p>
+  </li>
+</ul>
+
+<p>So clearly, then, the line that invokes <code class="highlighter-rouge">copy()</code> has the potential to throw
+an exception. What would happen to our data structure in this case? There
+are a few cases:</p>
+
+<ul>
+  <li>
+    <p>It could be completely empty if the allocation itself fails (out of
+memory or a throwing constructor for <code class="highlighter-rouge">T</code> during the <code class="highlighter-rouge">new[]</code> call).</p>
+  </li>
+  <li>
+    <p>It could be partially-copied if the exception came from <code class="highlighter-rouge">T::operator=()</code>
+when copying the data.</p>
+  </li>
+</ul>
+
+<p>So what can we do to deal with this exception?</p>
+
+<p>Let me be clear here: our goal is <strong>not</strong> to handle the exception. What
+should the program do if it can no longer allocate heap memory, for
+example? That’s not something that our data structure should be deciding.
+So we’re not even going to try to catch and handle this error: instead,
+what we’re going to try to guarantee is something about the <strong>state of our
+class</strong> after the exception has been thrown—namely, that it is in <strong>the
+same state as it was before the assignment line that caused the
+exception</strong>.</p>
+
+<h3 id="putting-the-safety-back-on-our-assignment-operator">Putting the safety back on our assignment operator</h3>
+
+<p>Using the template we had before, we could imagine rewriting it in the
+following way:</p>
+
+<div class="language-cpp highlighter-rouge"><pre class="highlight"><code><span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">T</span><span class="o">&gt;</span>
+<span class="n">dynamic_array</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;&amp;</span> <span class="n">dynamic_array</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;::</span><span class="k">operator</span><span class="o">=</span><span class="p">(</span><span class="k">const</span> <span class="n">dynamic_array</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;&amp;</span> <span class="n">rhs</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="k">this</span> <span class="o">!=</span> <span class="o">&amp;</span><span class="n">rhs</span><span class="p">)</span>
+    <span class="p">{</span>
+        <span class="n">T</span><span class="o">*</span> <span class="n">nstorage</span> <span class="o">=</span> <span class="nb">NULL</span><span class="p">;</span>
+        <span class="k">try</span>
+        <span class="p">{</span>
+            <span class="n">nstorage</span> <span class="o">=</span> <span class="k">new</span> <span class="n">T</span><span class="p">[</span><span class="n">rhs</span><span class="p">.</span><span class="n">capacity_</span><span class="p">];</span>
+            <span class="n">std</span><span class="o">::</span><span class="n">copy</span><span class="p">(</span><span class="n">rhs</span><span class="p">.</span><span class="n">storage_</span><span class="p">,</span> <span class="n">rhs</span><span class="p">.</span><span class="n">storage_</span> <span class="o">+</span> <span class="n">rhs</span><span class="p">.</span><span class="n">size_</span><span class="p">,</span> <span class="n">nstorage</span><span class="p">);</span>
+        <span class="p">}</span>
+        <span class="k">catch</span> <span class="p">(...)</span>
+        <span class="p">{</span>
+            <span class="k">delete</span><span class="p">[]</span> <span class="n">nstorage</span><span class="p">;</span>
+            <span class="k">throw</span><span class="p">;</span>
+        <span class="p">}</span>
+
+        <span class="k">delete</span><span class="p">[]</span> <span class="n">storage_</span><span class="p">;</span>
+        <span class="n">storage_</span> <span class="o">=</span> <span class="n">nstorage</span><span class="p">;</span>
+        <span class="n">capacity_</span> <span class="o">=</span> <span class="n">rhs</span><span class="p">.</span><span class="n">capacity_</span><span class="p">;</span>
+        <span class="n">size_</span> <span class="o">=</span> <span class="n">rhs</span><span class="p">.</span><span class="n">size_</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="o">*</span><span class="k">this</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>Shield your eyes! The horror! The code has exploded, has a horrible
+<code class="highlighter-rouge">try/catch</code> block to handle the fact that <code class="highlighter-rouge">std::copy()</code> could throw during
+the assignment into the array (the cost of a generic type <code class="highlighter-rouge">T</code> here), and is
+now almost <strong>certainly</strong> above the threshold of beginner programmers.</p>
+
+<p>But it <em>is</em> exception safe.</p>
+
+<h1 id="back-to-the-drawing-board">Back to the drawing board</h1>
+
+<p>The above monstrosity is clearly beyond what we want to teach. There’s no
+reason we shouldn’t be able to achieve both goals: the ease of
+understanding that came with the <code class="highlighter-rouge">clear()</code> then <code class="highlighter-rouge">copy()</code> version, and also
+providing the strong exception safety guarantee.</p>
+
+<p>This is where the “copy and swap” idiom comes into play. (It’s worth noting
+that this idiom is <em>even more</em> useful in C++11/14, but we’ll get there
+later.)</p>
+
+<p>We start with the following observations:</p>
+
+<ul>
+  <li>
+    <p>We want <code class="highlighter-rouge">operator=()</code> to create new memory that is a completely
+independent copy of the parameter.</p>
+  </li>
+  <li>
+    <p>We must release the memory associated with the current object.</p>
+  </li>
+  <li>
+    <p>The current object must refer to the new memory that we’ve created.</p>
+  </li>
+</ul>
+
+<p>…what if I told you that we <strong>already wrote most of this</strong> by virtue of
+having a well defined class? A <code class="highlighter-rouge">copy()</code> helper? We have a copy
+<em>constructor</em>!  Let’s see if we can’t use <em>that</em> as a form of “helper
+function”. Remember from the above code that we want the following
+chain of events:</p>
+
+<ul>
+  <li>Allocate memory</li>
+  <li>Copy over values</li>
+  <li>Free old memory</li>
+  <li>Refer to the new copy</li>
+</ul>
+
+<p>and further note that there’s no reason we couldn’t do the last two in a
+different order (we’d just need a temporary).</p>
+
+<p>Let’s first define a helper function that we’ll use in our implementation:</p>
+
+<div class="language-cpp highlighter-rouge"><pre class="highlight"><code><span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">T</span><span class="o">&gt;</span>
+<span class="kt">void</span> <span class="n">dynamic_array</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;::</span><span class="n">swap</span><span class="p">(</span><span class="n">dynamic_array</span><span class="o">&amp;</span> <span class="n">other</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="c1">// enable ADL---not truly necessary in this case, but this is good
+</span>    <span class="c1">// practice
+</span>    <span class="k">using</span> <span class="n">std</span><span class="o">::</span><span class="n">swap</span><span class="p">;</span>
+
+    <span class="n">swap</span><span class="p">(</span><span class="n">storage_</span><span class="p">,</span> <span class="n">other</span><span class="p">.</span><span class="n">storage_</span><span class="p">);</span>
+    <span class="n">swap</span><span class="p">(</span><span class="n">size_</span><span class="p">,</span> <span class="n">other</span><span class="p">.</span><span class="n">size_</span><span class="p">);</span>
+    <span class="n">swap</span><span class="p">(</span><span class="n">capacity_</span><span class="p">,</span> <span class="n">other</span><span class="p">.</span><span class="n">capacity_</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>To be a good citizen, let’s also define a non-member swap function for our
+class that just delegates to the helper above<sup id="fnref:nonmember-swap-foot"><a href="#fn:nonmember-swap-foot" class="footnote">1</a></sup>:</p>
+
+<div class="language-cpp highlighter-rouge"><pre class="highlight"><code><span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">T</span><span class="o">&gt;</span>
+<span class="kt">void</span> <span class="n">swap</span><span class="p">(</span><span class="n">dynamic_array</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;&amp;</span> <span class="n">first</span><span class="p">,</span> <span class="n">dynamic_array</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;&amp;</span> <span class="n">second</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">first</span><span class="p">.</span><span class="n">swap</span><span class="p">(</span><span class="n">second</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>And now consider the following implementation for the assignment operator:</p>
+
+<div class="language-cpp highlighter-rouge"><pre class="highlight"><code><span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">T</span><span class="o">&gt;</span>
+<span class="n">dynamic_array</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;&amp;</span> <span class="n">dynamic_array</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;::</span><span class="k">operator</span><span class="o">=</span><span class="p">(</span><span class="n">dynamic_array</span> <span class="n">rhs</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">swap</span><span class="p">(</span><span class="n">rhs</span><span class="p">);</span>
+    <span class="k">return</span> <span class="o">*</span><span class="k">this</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p><strong>Woah!</strong> We have <strong>two lines of code</strong>. There’s no way that gets us
+everything we need… right?</p>
+
+<p>But it does.</p>
+
+<ul>
+  <li>
+    <p>We get the copy by virtue of the argument being passed by value.</p>
+  </li>
+  <li>
+    <p>If the copying fails (e.g., the copy constructor throws), <strong>our function
+is not run at all</strong>, so our class appears unchanged by the assignment
+because it truly <strong>didn’t happen</strong>.</p>
+  </li>
+  <li>
+    <p>Swapping with the value parameter accomplishes our resource release.
+Remember that any parameters passed by value are going to have their
+destructors invoked when the stack frame for that function is popped.</p>
+  </li>
+  <li>
+    <p>We don’t have to check for self assignment anymore, as that code path can
+now be handled without a special case. Yes, it is less efficient, but the
+point of checking for self assignment wasn’t as an optimization, it was a
+“please don’t crash my program” check.</p>
+  </li>
+</ul>
+
+<h3 id="the-catch">The Catch</h3>
+<p>The only thing we have to guarantee now is that our copy constructor
+satisfies the <strong>basic exception guarantee</strong> (which is to say that it does
+not leak in the event of an exception), which isn’t <em>too</em> bad (though the
+code is still not ideal):</p>
+
+<div class="language-cpp highlighter-rouge"><pre class="highlight"><code><span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">T</span><span class="o">&gt;</span>
+<span class="n">dynamic_array</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;::</span><span class="n">dynamic_array</span><span class="p">(</span><span class="k">const</span> <span class="n">dynamic_array</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;&amp;</span> <span class="n">other</span><span class="p">)</span>
+    <span class="o">:</span> <span class="n">storage_</span><span class="p">(</span><span class="k">new</span> <span class="n">T</span><span class="p">[</span><span class="n">other</span><span class="p">.</span><span class="n">capacity_</span><span class="p">]),</span>
+      <span class="n">size_</span><span class="p">(</span><span class="n">other</span><span class="p">.</span><span class="n">size_</span><span class="p">),</span>
+      <span class="n">capacity_</span><span class="p">(</span><span class="n">other</span><span class="p">.</span><span class="n">capacity_</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="k">try</span>
+    <span class="p">{</span>
+        <span class="n">std</span><span class="o">::</span><span class="n">copy</span><span class="p">(</span><span class="n">other</span><span class="p">.</span><span class="n">storage_</span><span class="p">,</span> <span class="n">other</span><span class="p">.</span><span class="n">storage_</span> <span class="o">+</span> <span class="n">size</span><span class="p">,</span> <span class="n">storage_</span><span class="p">);</span> <span class="c1">// (1)
+</span>    <span class="p">}</span>
+    <span class="k">catch</span> <span class="p">(...)</span>
+    <span class="p">{</span>
+        <span class="k">delete</span><span class="p">[]</span> <span class="n">storage_</span><span class="p">;</span>
+        <span class="k">throw</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>The nastiness here is because the marked line (1) could throw during <code class="highlighter-rouge">T</code>’s
+assignment operator.</p>
+
+<p>In the general case, there are ways of avoiding the <code class="highlighter-rouge">try/catch</code> here, but I
+think this is a reasonable compromise for now. It’s worth noting at this
+point that if you were teaching <code class="highlighter-rouge">operator=</code> with the <code class="highlighter-rouge">clear()</code> then
+<code class="highlighter-rouge">copy()</code> style, your copy constructor was probably exception unsafe, too,
+so this isn’t just a reflection of some “complication” in the copy-and-swap
+idiom.</p>
+
+<p>If you’re dealing with some type <code class="highlighter-rouge">T</code> that you know does not throw from its
+assignment operator (an assumption I’m willing to make when teaching novice
+programmers), then the code can be simplified to just:</p>
+
+<div class="language-cpp highlighter-rouge"><pre class="highlight"><code><span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">T</span><span class="o">&gt;</span>
+<span class="n">dynamic_array</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;::</span><span class="n">dynamic_array</span><span class="p">(</span><span class="k">const</span> <span class="n">dynamic_array</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;&amp;</span> <span class="n">other</span><span class="p">)</span>
+    <span class="o">:</span> <span class="n">storage_</span><span class="p">(</span><span class="k">new</span> <span class="n">T</span><span class="p">[</span><span class="n">other</span><span class="p">.</span><span class="n">capacity_</span><span class="p">]),</span>
+      <span class="n">size_</span><span class="p">(</span><span class="n">other</span><span class="p">.</span><span class="n">size_</span><span class="p">),</span>
+      <span class="n">capacity_</span><span class="p">(</span><span class="n">other</span><span class="p">.</span><span class="n">capacity_</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">copy</span><span class="p">(</span><span class="n">other</span><span class="p">.</span><span class="n">storage_</span><span class="p">,</span> <span class="n">other</span><span class="p">.</span><span class="n">storage_</span> <span class="o">+</span> <span class="n">size_</span><span class="p">,</span> <span class="n">storage_</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>We’ll revisit this later when we start talking about C++11/14 and show how
+just a simple language switch can ensure that we get the basic exception
+guarantee out of our copy constructor in the general case <strong>by only a one
+line change to the above initializer list!</strong></p>
+
+<h1 id="closing-thoughts-an-exception-safe-big-three-for-intro-programmers">Closing Thoughts: An exception-safe “Big Three” for intro programmers</h1>
+<p>Let’s recap what our code for the “Big Three” looks like now, including all
+of our helper functions:</p>
+
+<div class="language-cpp highlighter-rouge"><pre class="highlight"><code><span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">T</span><span class="o">&gt;</span>
+<span class="k">class</span> <span class="nc">dynamic_array</span>
+<span class="p">{</span>
+  <span class="k">public</span><span class="o">:</span>
+    <span class="n">dynamic_array</span><span class="p">();</span>
+
+    <span class="n">dynamic_array</span><span class="p">(</span><span class="kt">size_t</span><span class="p">);</span>
+
+    <span class="n">dynamic_array</span><span class="p">(</span><span class="k">const</span> <span class="n">dynamic_array</span><span class="o">&amp;</span><span class="p">);</span>
+
+    <span class="n">dynamic_array</span><span class="o">&amp;</span> <span class="k">operator</span><span class="o">=</span><span class="p">(</span><span class="n">dynamic_array</span><span class="p">);</span>
+
+    <span class="o">~</span><span class="n">dynamic_array</span><span class="p">();</span>
+
+    <span class="kt">void</span> <span class="n">swap</span><span class="p">(</span><span class="n">dynamic_array</span><span class="o">&amp;</span> <span class="n">other</span><span class="p">);</span>
+
+    <span class="c1">// other functions, e.g. operator[], push_back(), push_front(), size(), etc.
+</span>
+  <span class="k">private</span><span class="o">:</span>
+    <span class="n">T</span><span class="o">*</span> <span class="n">storage_</span><span class="p">;</span>
+    <span class="kt">size_t</span> <span class="n">size_</span><span class="p">;</span>
+    <span class="kt">size_t</span> <span class="n">capacity_</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">T</span><span class="o">&gt;</span>
+<span class="n">dynamic_array</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;::</span><span class="n">dynamic_array</span><span class="p">(</span><span class="k">const</span> <span class="n">dynamic_array</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;&amp;</span> <span class="n">other</span><span class="p">)</span>
+    <span class="o">:</span> <span class="n">storage_</span><span class="p">(</span><span class="k">new</span> <span class="n">T</span><span class="p">[</span><span class="n">other</span><span class="p">.</span><span class="n">capacity_</span><span class="p">]),</span>
+      <span class="n">size_</span><span class="p">(</span><span class="n">other</span><span class="p">.</span><span class="n">size_</span><span class="p">),</span>
+      <span class="n">capacity_</span><span class="p">(</span><span class="n">other</span><span class="p">.</span><span class="n">capacity_</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="c1">// students will likely use a raw loop here, and that's fine
+</span>    <span class="c1">// we're also making the assumption that T::operator=() does not throw,
+</span>    <span class="c1">// in case you have a student who's an aspiring language lawyer =)
+</span>    <span class="n">std</span><span class="o">::</span><span class="n">copy</span><span class="p">(</span><span class="n">other</span><span class="p">.</span><span class="n">storage_</span><span class="p">,</span> <span class="n">other</span><span class="p">.</span><span class="n">storage_</span> <span class="o">+</span> <span class="n">size_</span><span class="p">,</span> <span class="n">storage_</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">T</span><span class="o">&gt;</span>
+<span class="kt">void</span> <span class="n">dynamic_array</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;::</span><span class="n">swap</span><span class="p">(</span><span class="n">dynamic_array</span><span class="o">&amp;</span> <span class="n">other</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">swap</span><span class="p">(</span><span class="n">storage_</span><span class="p">,</span> <span class="n">other</span><span class="p">.</span><span class="n">storage_</span><span class="p">);</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">swap</span><span class="p">(</span><span class="n">size_</span><span class="p">,</span> <span class="n">other</span><span class="p">.</span><span class="n">size_</span><span class="p">);</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">swap</span><span class="p">(</span><span class="n">capacity_</span><span class="p">,</span> <span class="n">other</span><span class="p">.</span><span class="n">capacity_</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">T</span><span class="o">&gt;</span>
+<span class="n">dynamic_array</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;&amp;</span> <span class="n">dynamic_array</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;::</span><span class="k">operator</span><span class="o">=</span><span class="p">(</span><span class="n">dynamic_array</span> <span class="n">rhs</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">swap</span><span class="p">(</span><span class="n">rhs</span><span class="p">);</span>
+    <span class="k">return</span> <span class="o">*</span><span class="k">this</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span> <span class="nc">T</span><span class="o">&gt;</span>
+<span class="n">dynamic_array</span><span class="o">&lt;</span><span class="n">T</span><span class="o">&gt;::~</span><span class="n">dynamic_array</span><span class="p">()</span>
+<span class="p">{</span>
+    <span class="k">delete</span><span class="p">[]</span> <span class="n">storage_</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<h2 id="advantages">Advantages</h2>
+
+<ul>
+  <li>
+    <p>Real world applicability: exceptions are everwhere, you need to know them
+and how to handle them</p>
+  </li>
+  <li>
+    <p>Simplified explanation for <code class="highlighter-rouge">operator=()</code>, using language concepts they’re
+learning as they are doing copy constructors anyway (pass by value)</p>
+  </li>
+  <li>
+    <p>Elimination of the self assignment check (self assignment is
+automatically valid in the copy-and-swap idiom)</p>
+  </li>
+  <li>
+    <p>A helper function that’s useful to the outside world: <code class="highlighter-rouge">a.swap(b)</code></p>
+  </li>
+</ul>
+
+<h2 id="disadvantages">Disadvantages</h2>
+
+<ul>
+  <li>
+    <p>Requires some discussion of what exceptions are, what they are used for,
+and why we care about them</p>
+  </li>
+  <li>
+    <p>If you are truly being careful, in C++98/03 you will need to have a
+<code class="highlighter-rouge">try/catch</code> block in the copy constructor (but not in C++11/14, more to
+come…)</p>
+  </li>
+</ul>
+
+<h1 id="coming-up">Coming Up</h1>
+<p>Now that we know about the copy-and-swap idiom, in the next post I’m going
+to talk briefly about move semantics in C++11/14, and then we can move on
+to tackle what I teased at in the very first post in this series: that we
+can teach manual memory management in C++11/14 <strong>without losing out on any
+teaching opportunities</strong> compared to C++98/03, all the while simultaneously
+being more modern and encouraging students to write safe code.</p>
+
+<p>Yell at me in the comments!</p>
+
+<div class="footnotes">
+  <ol>
+    <li id="fn:nonmember-swap-foot">
+
+      <p>This matters significantly less in C++11 for reasons we’ll get to
+(namely, move semantics), but it’s still a good idea. Given we aren’t
+targeting C++11 necessarily in this post, it’s good to make sure we’re
+doing it right. Thanks to Larry for pointing out the deficiency in the
+comments.&nbsp;<a href="#fnref:nonmember-swap-foot" class="reversefootnote">&#8617;</a></p>
+    </li>
+  </ol>
+</div>
+
+</article>
+
+
+
+    </section>
+
+          <footer>
+        <p>&copy; Chase Geigle, 2018 | All Rights Reserved.</p>
+      </footer>
+    </div>
+  </body>
+</html>
+
+
+  </body>
+</html>

@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html>
+
+      <head>
+        <meta charset="utf-8" />
+        <title>Overleaf Considered Harmful: Why a Simple git Repository is Best for Academic Writing</title>
+        <meta name="viewport" content="width=device-width" />
+        <meta name="description" content="The musings of a Computer Scientist/Educator." />
+        <link rel="canonical" href="https://chara.cs.illinois.edu/blog/2018/02/22/why-a-simple-git-repository-is-best-for-academic-writing//" />
+        <link rel="stylesheet" href="/css/main.css" />
+    </head>
+
+
+  <body>
+
+        <!--[if lt IE 9]>
+    <script src="http://css3-mediaqueries-js.googlecode.com/svn/trunk/css3-mediaqueries.js"></script>
+    <![endif]-->
+    <script type="text/x-mathjax-config">
+      MathJax.Hub.Config({tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']],
+                         displayMath: [['\\[','\\]'], ['$$','$$']]}});
+    </script>
+    <script type="text/javascript"
+      src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+    </script>
+    <div id="main">
+      <header>
+        <div>
+          <div class="container">
+            <h1>Chase Geigle</h1>
+            <nav class="topnav">
+              <ul class="navigation">
+                <li><a href="/">Home</a></li>
+                <li><a href="/posts/">Posts</a></li>
+                <li><a href="/publications/">Publications</a></li>
+                <li><a href="/teaching/">Teaching</a></li>
+              </ul>
+            </nav>
+          </div>
+        </div>
+      </header>
+
+
+    <section class="content">
+      
+<div class="title">
+  <h1>Overleaf Considered Harmful: Why a Simple git Repository is Best for Academic Writing</h1>
+  
+  <span class="date">Posted: February 22, 2018</span>
+  
+</div>
+
+<article>
+  <p>(<strong>Note:</strong> This is written from the context of academic writing in Computer
+Science and related fields—I understand much of this may not generalize
+to people who don’t write all of their articles in something like LaTeX or
+<code class="highlighter-rouge">pandoc</code>.)</p>
+
+<p>When writing an academic article with multiple collaborators, you really
+want to be using a <code class="highlighter-rouge">git</code> repository to manage your LaTeX sources and/or
+other related materials.</p>
+
+<p>I think this is common advice given out to grad students
+in CS and related departments, but a lot of people don’t really seem to be
+taking it to heart. Using tools like <a href="https://www.overleaf.com">Overleaf</a>,
+<a href="https://www.sharelatex.com">ShareLaTeX</a>, or even a shared sync folder like
+<a href="https://www.dropbox.com">Dropbox</a> seems to be the norm. While I’m in agreement that these
+tools can really reduce the friction for getting started, I think that it’s
+in your best interest as a <strong>graduate student learning how to write
+effectively in an academic setting</strong> to use a <code class="highlighter-rouge">git</code> repository instead.
+Here are my reasons why.</p>
+
+<h2 id="1-learning-through-diffs">1. Learning Through <code class="highlighter-rouge">diff</code>s</h2>
+
+<p>When you use <code class="highlighter-rouge">git</code> to manage your paper’s sources, you are more or less
+forced to create a built-in CHANGELOG for your paper. What was changed? In
+what section? Why was the change made?  These things, even when being
+incredibly brief, make their way into your (and others’) commit messages
+and provide important <strong>context</strong> for the changes being made in a paper.
+You also get a very explicit denotation of what <strong>exactly</strong> was changed
+between two versions of the paper, rather than having to implicitly
+discover them by occasionally stumbling upon words that you don’t think you
+initially wrote.</p>
+
+<p>Why is this important? One of the implicit goals of getting a research
+degree (a thesis Master’s or a PhD) is to learn how to communicate
+complex ideas clearly and efficiently. As a graduate student (especially at
+the early stages), most of what we are doing is imitation—we read a bunch
+of papers that we like, and we do our best to write in a way that emulates
+that “voice”. This is can be an effective strategy, but it’s sort of like
+trying to learn how to cook by eating food at a restaurant. Sure, you can
+really learn to appreciate what constitutes a great meal, but you aren’t
+developing any real sense of the <strong>process</strong> by which that success was
+created. Nobody becomes a <a href="https://en.wikipedia.org/wiki/Michelin_Guide#Stars">Michelin star</a> chef by solely
+being a food critic.</p>
+
+<p>If you use version control, and you <strong>pay attention to what your more
+experienced collaborators and advisor are doing</strong>, you can start to pick up
+on strategies and patterns that they employ <em>and don’t even know that they
+are employing</em> to construct well written arguments. This goes beyond even
+the most concrete advice and examples they can give you, because you can
+see <em>exactly</em> what changes they made to <em>your</em> writing to improve it. This
+is the most concrete and actionable advice you can get, and if you’re not
+using version control <em>most of this advice is just being lost</em>. Don’t throw
+away valuable learning opportunities. Version control your sources, and
+learn from the patches made by people with more experience than you.</p>
+
+<h2 id="2-versioning-of-arguments">2. Versioning of Arguments</h2>
+
+<p>When you use a standard <code class="highlighter-rouge">git</code> repo, you automatically create a version
+history of the argument and framing you are using in the paper. If at any
+point in time you want to go back to something that used to be there, you
+can. This gives you a degree of freedom that I feel a lot of people are
+uncomfortable with, but is very freeing once you recognize you have it.</p>
+
+<p>If you’re using version control, you don’t need to comment out sentences or
+use <code class="highlighter-rouge">\ignore{}</code>-style macros when they’ve been replaced or when they become
+vestigial. Just delete them. You can <em>always</em> get them back, because they
+are part of the version history. The current document should reflect
+<em>exactly what is in the text of the current version</em>, not some strange
+mishmash of things that used to be and things that currently are. I see
+this a lot in Dropbox or Overleaf documents where people are afraid of
+losing material when they remove it from a version of the paper. This is
+because the versioning in these systems is hidden from you and is not
+explicit. <code class="highlighter-rouge">git</code> gives you exactly what changes were made between each
+version, by whom, and for what reason.</p>
+
+<p>As a collaborator, this empowers you to make wording changes wherever you
+feel it might help. If the main author doesn’t like them, they can always go
+back to what was previously there with minimal effort, without you having
+to make the source an ugly mess with <code class="highlighter-rouge">\ignore{}</code>s and commented out text
+everywhere. Make the changes you want to make, justify them in your commit
+message, and your intent is made clear to all authors so they can continue
+to improve upon what you’ve done.</p>
+
+<p>Being able to quickly get a sense of how a paper has evolved between
+editing sessions is also invaluable as a collaborator. What did my
+co-authors change since the last time I viewed the paper? Where should I
+focus my efforts? If you’re using a <code class="highlighter-rouge">git</code> repository, this is as simple as
+a <code class="highlighter-rouge">git fetch &amp;&amp; git diff origin/master</code> away. If you’re using pretty much
+anything else, you’re more or less forced to have to have an old copy of
+the generated PDF sitting around somewhere to manually compare things. This
+slows down the process of editing and providing feedback.</p>
+
+<h2 id="3-versioning-of-figures">3. Versioning of Figures</h2>
+
+<p>This is a big one for me. When you’re polishing a manuscript, you are going
+to spend a lot of time generating figures and plots for the paper. These
+will be regenerated numerous times, changing things like the coloration,
+the label sizes, the positioning of the legend(s), and sometimes even the
+plot type itself.</p>
+
+<p>A lot of the times when dealing with a Dropbox or Overleaf manuscript,
+these figures are “magic”. They appear out of nowhere, with no context for
+how they were generated, as files uploaded into a <code class="highlighter-rouge">figures/</code> folder in the
+project. By using a <code class="highlighter-rouge">git</code> repository, it is much more natural to start to
+consider the fact that the “source” for a paper ought to include the
+“source” for the figures as well. If you adhere to this, you commit the
+code used to generate a figure alongside the actual figure itself. You can
+now go back to any previous iteration of a figure effortlessly, and you can
+also see the progression of a figure from initial conception to the final
+polished version. Doing this also makes more explicit the exact data used
+to generate the figure<sup id="fnref:figures-and-data"><a href="#fn:figures-and-data" class="footnote">1</a></sup>, so you don’t come back to a
+paper months later having no idea what data was used for generating the
+figure.</p>
+
+<p>If you don’t version your figures and their associated sources, you don’t
+actually have a full history for your paper. <strong>Version your figures!</strong></p>
+
+<h2 id="4-offline-work-and-conflict-resolution">4. Offline Work and Conflict Resolution</h2>
+
+<div class="language-bash highlighter-rouge"><pre class="highlight"><code><span class="gp">$ </span>ls
+<span class="s2">"sec_introduction (XXX's conflicted copy YYYY-MM-DD).tex"</span>
+<span class="s2">"sec_introduction.tex"</span>
+<span class="s2">"abstract (XXX's conflicted copy YYYY-MM-DD).tex"</span>
+<span class="s2">"abstract.tex"</span>
+<span class="s2">"sec_experiments (XXX's conflicted copy YYYY-MM-DD).tex"</span>
+<span class="s2">"sec_experiments (YYY's conflicted copy YYYY-MM-DD).tex"</span>
+<span class="s2">"sec_experiments.tex"</span>
+...
+</code></pre>
+</div>
+
+<p>This sort of disaster is common when using Dropbox to collaborate. In an
+academic setting, your advisor is likely to spend a <em>ton</em> of time at about
+35,000 feet above Earth’s surface. Internet connectivity on
+flights is starting to get better, but is typically still spotty at best
+even when flying with business or first-class accommodations.</p>
+
+<p>Now, you can’t avoid conflicts if two people edit the same passage at the
+same time offline. Every collaboration system will have this problem. But
+with a true version control system like <code class="highlighter-rouge">git</code>, you at least get <em>somewhat
+sane conflict resolution</em> built-in to the tool. And, in the event that
+nobody worked on the same paragraph at the same time, you’re likely to
+avoid conflicts at all and get just a nice, clean merge when your
+collaborator finally gets an Internet connection at their hotel or the
+conference venue.</p>
+
+<p>Online-only systems like Overleaf or ShareLaTeX lock out your advisor and
+collaborators from working on the paper while they’re in the air or
+otherwise away from a stable Internet connection. In grad school, you’re
+going to want to maximize the amount of possible times your advisor and
+collaborators can potentially spend looking at your paper. Using a simple
+<code class="highlighter-rouge">git</code> repository ensures they can still be helpful when traveling abroad.</p>
+
+<h2 id="5-learning-from-each-other">5. Learning From Each Other</h2>
+
+<p>The utility of this depends on your exact <code class="highlighter-rouge">git</code> setup, but the
+configuration I’m seeing become a growing trend is for research groups to
+have either a private <code class="highlighter-rouge">git</code> hosting solution set up on-site, or to be using
+a GitHub organization or similar on some shared repository hosting website.
+In that kind of setting, you can learn a lot about writing from your lab
+mates should you be able to view their papers’ <code class="highlighter-rouge">git</code> histories, too.</p>
+
+<p>When things are locked away in random Dropbox folders or in unorganized
+Overleaf/ShareLaTeX links thrown around in emails or messenger platforms,
+it becomes harder to develop some shared institutional knowledge about
+writing since it isn’t all together in one organized place.</p>
+
+<h2 id="but-overleaf-gives-me-a-git-repo">But Overleaf gives me a <code class="highlighter-rouge">git</code> repo!</h2>
+
+<p>Yes, <a href="https://www.overleaf.com/blog/195-new-collaborate-online-and-offline-with-overleaf-and-git-beta">it does</a>, but it <strong>completely misses the point</strong>. The
+advantage of having a <code class="highlighter-rouge">git</code> repository is that you have a complete,
+<strong>versioned history</strong> of all of the changes that were made. Overleaf’s
+<code class="highlighter-rouge">git</code> history is basically completely useless:</p>
+
+<div class="language-bash highlighter-rouge"><pre class="highlight"><code><span class="gp">$ </span>git log --pretty<span class="o">=</span>oneline
+01bf697c4422a417e7a2751095cf33d609c7e8f7 <span class="o">(</span>HEAD -&gt; master, origin/master, origin/HEAD<span class="o">)</span> Update on Overleaf.
+a0873e520e0a7f9b510646c165c68ae5f8dbf4a4 Update on Overleaf.
+cce528e94b0ce0a8e5faddadd47f98f0e5a9202a Update on Overleaf.
+9b28a1069c4134ab63a6029d4e97666161d1ce39 Update on Overleaf.
+fed08a3b8aa632e9be63c87b04a91723f31c77ed Update on Overleaf.
+6b71abd84014e5fe0b554eeeb8709d376be79674 Update on Overleaf.
+c11b6f08403c3fb7724ff08db5177855c3b51a2f Update on Overleaf.
+...
+</code></pre>
+</div>
+
+<p>What was the update? Why was it made? In what section? What was the
+rationale behind the change? All of this is missing in the <code class="highlighter-rouge">git</code> repo
+provided by Overleaf, which basically completely negates all of the
+advantages of using a <code class="highlighter-rouge">git</code> repository. Multiple commits are made for one
+change, including false-starts and mid-sentence revisions. The history, as
+a result, is full of meaningless <code class="highlighter-rouge">diff</code>s that defeat the purpose of
+maintaining a version history.</p>
+
+<h2 id="advice-for-maximizing-git-effectiveness">Advice for Maximizing <code class="highlighter-rouge">git</code> Effectiveness</h2>
+
+<p>Most of the discussion above is generally applicable even if you are using
+<code class="highlighter-rouge">git</code> poorly, but following good practices when using version control can
+magnify the benefits discussed above. Here are some concrete pieces of
+advice that can supercharge the benefit of using <code class="highlighter-rouge">git</code> over these other
+solutions:</p>
+
+<ol>
+  <li>
+    <p><strong>Commit early, often, and with small changes.</strong> This allows you to
+create a more granular version history and gives more opportunities to
+provide yourself and your collaborators context for the changes that
+were made.</p>
+
+    <p>Note that the distinction between <em>committing</em> and <em>pushing</em> in <code class="highlighter-rouge">git</code>
+allows you to do a lot of work locally, and then piece together chunks
+of changes that you made that logically go together later by using <code class="highlighter-rouge">git
+add -p filename</code>. The “right” way is to be making commits as you go,
+but I’ve found that I tend to forget to do that. <code class="highlighter-rouge">git add -p</code> is my
+crutch in those cases.</p>
+
+    <p>You want to make each commit a logical change. This is no different
+than when you’re using <code class="highlighter-rouge">git</code> for version control of a programming
+project. Each commit should explain what the commit is for, what the
+change does, and why the change was made. They should be as
+small and self-contained as humanly possible.</p>
+  </li>
+  <li>
+    <p><strong>Use good commit messages.</strong> <code class="highlighter-rouge">git commit -m "Rewrite introduction"</code> is
+less useful than doing a full <code class="highlighter-rouge">git commit</code> and opening up your text
+editor and writing a long-form message like:</p>
+
+    <div class="highlighter-rouge"><pre class="highlight"><code>Reframe introduction
+
+Emphasize the impact and problem importance earlier to hook the reader
+and be very explicit about the concrete contributions to avoid burying
+the lede.
+</code></pre>
+    </div>
+
+    <p>The more context you provide here, the more information you give anyone
+viewing the repository’s changeset (which includes your advisor and
+other collaborators).</p>
+
+    <p>Doing this right is <strong>hard</strong>, I know, but it is very useful. Strive to
+do the best you can.</p>
+  </li>
+  <li>
+    <p><strong>Use <code class="highlighter-rouge">--word-diff</code> or <code class="highlighter-rouge">--color-words</code></strong> in commands that print
+diff like <code class="highlighter-rouge">git diff</code> or <code class="highlighter-rouge">git log -p</code>. This is especially nice when
+viewing diffs of hard-wrapped text.</p>
+  </li>
+  <li>
+    <p><strong>Push and pull often.</strong> You want to make sure you’re up-to-date with
+your collaborators as you’re making changes. Going a long time between
+pulling in changes is a bad idea, especially when you know multiple
+people are working at once during crunch time. Frequent incorporation
+of changes can often avoid conflicts entirely, and when they <em>do</em> occur
+they are smaller in size and more manageable.</p>
+  </li>
+  <li>
+    <p><strong>Version as much as possible.</strong> This includes code and data used to
+generate figures, but also should include things like
+<code class="highlighter-rouge">requirements.txt</code> or <code class="highlighter-rouge">Pipfile</code>s for your code to capture the exact
+libraries and their versions used. You want to be able to come back to
+the repository potentially <strong>years later</strong> and still be able to compile
+the paper from scratch and update figures. Remember: if it’s your
+first-author paper it’s likely going to be part of your thesis. You’ll
+thank yourself later if you make porting its contents to the thesis
+format easier.</p>
+
+    <p>Try to document how to use your tools, what version of the Python
+interpreter you were using at the time, etc. This is useful for both
+you and your lab mates, should your group dynamic be to share completed
+results (and it should be).</p>
+  </li>
+</ol>
+
+<div class="footnotes">
+  <ol>
+    <li id="fn:figures-and-data">
+
+      <p>You should also ideally version control the data used
+for the figure generation as well. There’s an important distinction here
+between the <strong>raw</strong> data used for generating a figure and the
+<strong>relevant</strong> data used by the plot itself. I see a lot of “figure”
+creation scripts that do a lot of heavy processing before doing the
+actual work of making the plot. Save those intermediate results! If you
+can’t commit the raw data, at least commit the processed version of the
+data that has the relevant information for regenerating a plot.&nbsp;<a href="#fnref:figures-and-data" class="reversefootnote">&#8617;</a></p>
+    </li>
+  </ol>
+</div>
+
+</article>
+
+
+
+    </section>
+
+          <footer>
+        <p>&copy; Chase Geigle, 2018 | All Rights Reserved.</p>
+      </footer>
+    </div>
+  </body>
+</html>
+
+
+  </body>
+</html>

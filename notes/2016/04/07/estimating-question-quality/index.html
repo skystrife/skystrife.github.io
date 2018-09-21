@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+
+      <head>
+        <meta charset="utf-8" />
+        <title>Estimating question quality</title>
+        <meta name="viewport" content="width=device-width" />
+        <meta name="description" content="The musings of a Computer Scientist/Educator." />
+        <link rel="canonical" href="https://chara.cs.illinois.edu/notes/2016/04/07/estimating-question-quality//" />
+        <link rel="stylesheet" href="/css/main.css" />
+    </head>
+
+
+  <body>
+
+        <!--[if lt IE 9]>
+    <script src="http://css3-mediaqueries-js.googlecode.com/svn/trunk/css3-mediaqueries.js"></script>
+    <![endif]-->
+    <script type="text/x-mathjax-config">
+      MathJax.Hub.Config({tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']],
+                         displayMath: [['\\[','\\]'], ['$$','$$']]}});
+    </script>
+    <script type="text/javascript"
+      src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+    </script>
+    <div id="main">
+      <header>
+        <div>
+          <div class="container">
+            <h1>Chase Geigle</h1>
+            <nav class="topnav">
+              <ul class="navigation">
+                <li><a href="/">Home</a></li>
+                <li><a href="/posts/">Posts</a></li>
+                <li><a href="/publications/">Publications</a></li>
+                <li><a href="/teaching/">Teaching</a></li>
+              </ul>
+            </nav>
+          </div>
+        </div>
+      </header>
+
+
+    <section class="content">
+      
+<div class="title">
+  <h1>Estimating question quality</h1>
+  
+  <span class="date">Posted: April 07, 2016</span>
+  
+</div>
+
+<article>
+  <p>This is what we’ve come up with for estimating question quality. These are
+the key things we wanted in the measure:</p>
+
+<ol>
+  <li>
+    <p>We don’t want it to be biased toward older or newer questions.</p>
+
+    <ul>
+      <li>
+        <p>Older questions might end up biased because they’ve been around for
+longer, meaning they’ve had more time to accumulate upvotes when
+compared to newer questions.</p>
+      </li>
+      <li>
+        <p>Newer questions might end up biased because they were posted at a time
+when the community potentially had more active users, meaning they had
+a higher likelihood of being observed by more users.</p>
+      </li>
+    </ul>
+  </li>
+  <li>
+    <p>We want the measure to be comparable between quarters <em>within a
+community</em>, so we can answer questions like “did the quality go up
+between Q1 and Q2?”</p>
+  </li>
+  <li>
+    <p>We want a normalized measure, so we can compare quality scores <em>between
+communities</em>, so we can answer questions like “is the question quality
+in this community better than this other one?”</p>
+  </li>
+</ol>
+
+<p>We arrived at the following. Let’s first try to define an estimate for the
+likelihood that a random user who decides to take at least one <em>active</em>
+action on question $q$ would eventually go on to upvote it. The assumption
+here is that high quality questions would have a higher probability of this
+event. We can estimate the probability as</p>
+
+<script type="math/tex; mode=display">P(v_{\uparrow} \mid q)
+    \approx \frac{c(v_{\uparrow}, q) + \alpha}
+                 {|\{ u \in U \mid u \text{ acted on } q\}| + \alpha + \beta}</script>
+
+<p>where $v_{\uparrow}$ represents an upvote, $c(v_{\uparrow}, q)$ is the
+number of upvotes $q$ received, $U$ is the set of all users in this
+community, and “acted on” is defined as having voted on, commented on, or
+answered a question. $\alpha$ and $\beta$ are the hyperparameters of a Beta
+prior on this probability so we can smooth away bad estimates from
+questions that have very little activity.</p>
+
+<p>This is also equivalent to saying</p>
+
+<script type="math/tex; mode=display">P(v_{\uparrow} \mid q) \approx
+  \frac{n}{n+n_0} \hat{\theta} + \frac{n_0}{n + n_0} \theta_0</script>
+
+<p>where $n = |\{u \in U \mid u \text{ acted on } q\}|$, $n_0$ is the number
+of “pseudo-users” that acted on $q$, and $\hat{\theta}$ and $\theta_0$ are
+the MLE and prior estimates for the upvote probability, respectively.</p>
+
+<p>We are planning on estimating $\theta_0$ based on the average number of
+upvotes relative to the number of users who acted on a question across all
+questions in all Stack Exchanges we have, and then setting $n_0$ to some
+reasonable value for smoothing the actual probability estimates. (Is this
+cheating? If so, we could exclude the current community from our estimate
+for $\theta_0$.)</p>
+
+<p>We can also estimate an equivalent $P(v_{\downarrow} \mid q)$ for the
+probability of receiving a downvote, and our overall quality score can then
+be</p>
+
+<script type="math/tex; mode=display">s(q) = P(v_{\uparrow} \mid q) - P(v_{\downarrow} \mid q)</script>
+
+<p>which is bounded between $[-1, 1]$, can be compared within a community
+across time periods, and can be compared between communities.</p>
+
+</article>
+
+
+
+    </section>
+
+          <footer>
+        <p>&copy; Chase Geigle, 2018 | All Rights Reserved.</p>
+      </footer>
+    </div>
+  </body>
+</html>
+
+
+  </body>
+</html>

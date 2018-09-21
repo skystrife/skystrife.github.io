@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+
+      <head>
+        <meta charset="utf-8" />
+        <title>The Case for Modernizing C++ Coverage in Curriculums</title>
+        <meta name="viewport" content="width=device-width" />
+        <meta name="description" content="The musings of a Computer Scientist/Educator." />
+        <link rel="canonical" href="https://chara.cs.illinois.edu/blog/2014/08/22/the-case-for-modernizing-cxx-coverage-in-curriculums//" />
+        <link rel="stylesheet" href="/css/main.css" />
+    </head>
+
+
+  <body>
+
+        <!--[if lt IE 9]>
+    <script src="http://css3-mediaqueries-js.googlecode.com/svn/trunk/css3-mediaqueries.js"></script>
+    <![endif]-->
+    <script type="text/x-mathjax-config">
+      MathJax.Hub.Config({tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']],
+                         displayMath: [['\\[','\\]'], ['$$','$$']]}});
+    </script>
+    <script type="text/javascript"
+      src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+    </script>
+    <div id="main">
+      <header>
+        <div>
+          <div class="container">
+            <h1>Chase Geigle</h1>
+            <nav class="topnav">
+              <ul class="navigation">
+                <li><a href="/">Home</a></li>
+                <li><a href="/posts/">Posts</a></li>
+                <li><a href="/publications/">Publications</a></li>
+                <li><a href="/teaching/">Teaching</a></li>
+              </ul>
+            </nav>
+          </div>
+        </div>
+      </header>
+
+
+    <section class="content">
+      
+<div class="title">
+  <h1>The Case for Modernizing C++ Coverage in Curriculums</h1>
+  
+  <span class="date">Posted: August 22, 2014</span>
+  
+</div>
+
+<article>
+  <p>With the <a href="https://isocpp.org/blog/2014/08/we-have-cpp14">passage of C++14</a>, many of our C++ curriculum plans are
+being left in the dust. C++14 is not just a theoretical language that’s
+going to “eventually come”: it’s here, right now, and it’s here to stay.
+There is already a completely conforming compiler (<a href="http://clang.llvm.org/">clang</a>) and
+standard library (<a href="http://libcxx.llvm.org/">libc++</a>) that is shipping on what is arguably
+the  most popular computing platform among our students: Apple’s OSX.</p>
+
+<p>Many companies (and research projects) have already begun to embrace C++11
+(current examples: Apple, Facebook, Google, LLVM)—the reality of the
+situation is that our students are going to be encountering C++11/14 in the
+“real world” immediately after graduating.</p>
+
+<p>Most courses that teach C++ right now are using C++03. This is a language
+that is nearly 11 years old! And that’s if we’re generous and really count
+C++03 (a very minor, bugfix release for the language) as a new language.
+<a href="http://www.aristeia.com/">Scott Meyers</a> (rather famous in the C++ community) rarely makes a
+distinction between the two. If we too do not distinguish C++03 from C++98,
+then what’s really being taught is <strong>a language which is in its teens</strong>!</p>
+
+<p>Now there’s nothing explicitly wrong with teaching an old language. There’s
+a lot of merit to teaching the <a href="https://chara.cs.illinois.edu/sites/cs528/">Design Patterns course</a> using
+Smalltalk, for example. Courses about programming languages and compilers
+can get very far by teaching in some dialect of Lisp. Good ideas in these
+languages don’t suddenly become stale: there’s a lot they can still teach
+us.</p>
+
+<p>But what we’re talking about here isn’t just that C++98 is an old language.
+It’s a language that has been <strong>deprecated</strong> by the very existence of
+C++11. Sure, the techniques you learn for C++98 are not just going to stop
+working when you switch to C++11. There’s (almost) nothing about the
+language that isn’t backwards compatible.</p>
+
+<p>But the <strong>way you express your ideas</strong> is different. And this is an
+important point. If you were to write code using C++98 idioms in a C++11/14
+codebase, your code won’t have a chance of passing code review. Ideas are
+expressed not just differently, but in <strong>safer ways than before</strong>:</p>
+
+<ul>
+  <li>
+    <p>Common C++ memory safety pitfalls can be completely eliminated via the
+combination of <a href="https://en.wikipedia.org/wiki/Resource_Acquisition_Is_Initialization">resource acquisition is initialization</a> (an old
+concept) and move semantics (a new concept). (It’s worth noting that this
+idea of “move semantics” is also present in Mozilla’s Rust language, which
+is being designed from the ground-up to be a safe, systems-level language.)</p>
+  </li>
+  <li>
+    <p>Code that was inefficient in C++98 that required horrible, nasty,
+error-prone workarounds is now instantly efficient in the presence of move
+semantics (and I don’t even need to rely on <a href="https://en.wikipedia.org/wiki/Return_value_optimization">return value
+optimization</a>).</p>
+  </li>
+</ul>
+
+<p>We are obligated as educators to begin exposing our students to these
+better, more modern idioms for expressing their ideas through programs in
+C++.</p>
+
+<p>And let me be clear: in doing so we <strong>do not lose anything</strong> compared to
+the old style of teaching.</p>
+
+<p>Because I don’t really expect you to believe me, the next few posts in this
+series will attempt to demonstrate what I feel are the few (really, two)
+most important features in C++11/14 for teaching in the undergraduate
+curriculum. The discussion will be focused primarily on the current
+curriculum at UIUC (the basis for my observations), and thus will have a
+strong focus on teaching the following few learning objectives:</p>
+
+<ul>
+  <li>Manual memory management (heap memory)</li>
+  <li>Implementing classes that use resources (e.g., memory) in C++</li>
+</ul>
+
+<p>Think I’m on to something? Or just insane? Shout it out in the comments!</p>
+
+
+</article>
+
+
+
+    </section>
+
+          <footer>
+        <p>&copy; Chase Geigle, 2018 | All Rights Reserved.</p>
+      </footer>
+    </div>
+  </body>
+</html>
+
+
+  </body>
+</html>
